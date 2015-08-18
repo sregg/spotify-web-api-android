@@ -5,34 +5,44 @@
 This project is a wrapper for the [Spotify Web API](https://developer.spotify.com/web-api/).
 It uses [Retrofit](http://square.github.io/retrofit/) to create Java interfaces from API endpoints.
 
-## Building
+## <a name="building"></a>Building
 This project is built using [Gradle](https://gradle.org/):
 
 1. Clone the repository: `git clone https://github.com/kaaes/spotify-web-api-android.git`
-2. Build: `./gradlew jar`
-3. Grab the jar and put it in your project. It can be found in `build/libs/spotify-web-api-android-0.1.0.jar`
+2. Build: `./gradlew assemble`
+3. Grab the `aar` that can be found in `spotify-api/build/outputs/aar/spotify-web-api-android-0.1.1.aar` and put it in the `libs` folder in your application
 
-#### Dependencies
+## Integration into your project
 
-This project depends on `Retrofit 1.9.0` and `OkHttp 2.2.0`. When you build it using
-the command above it creates a lean jar that doesn't contain Retrofit and OkHttp files.
-To make your app work you'll need to include these dependencies in your app:
+This project depends on `Retrofit 1.9.0` and `OkHttp 2.2.0`. When you [build it](#building), it creates an `aar`
+that doesn't contain Retrofit and OkHttp files. To make your app work you'll need to include these
+dependencies in your app's `build.gradle` file.
 
-```java
-compile 'com.squareup.retrofit:retrofit:1.9.0'
-compile 'com.squareup.okhttp:okhttp:2.2.0'
+Add following to the `build.gradle` file in your app:
+
+```groovy
+repositories {
+    mavenCentral()
+    flatDir {
+        dirs 'libs'
+    }
+}
+
+dependencies {
+    compile(name:'spotify-web-api-android-0.1.0', ext:'aar')
+    compile 'com.squareup.retrofit:retrofit:1.9.0'
+    compile 'com.squareup.okhttp:okhttp:2.2.0'
+
+    // Other dependencies your app might use
+}
 ```
 
-It is also possible to build the project as a fat jar that contains all dependencies. To do this run:
-
-`./gradlew jarAll`
-
-the jar will be located in `build/libs/spotify-web-api-android-all-0.1.0.jar`
-
+The `repositories` section tells your application to look for the `spotify-web-api-android-0.1.1.aar`
+in the local repository in the `libs` folder.
 
 ## Usage
 
-Out of the box it uses [OkHttp](http://square.github.io/okhttp/) HTTP client and a [single thread executor](https://docs.oracle.com/javase/7/docs/api/java/util/concurrent/Executors.html#newSingleThreadExecutor()).
+Out of the box it uses [OkHttp](http://square.github.io/okhttp/) HTTP client and a [single thread executor](https://docs.oracle.com/javase/7/docs/api/java/util/concurrent/Executors.html).
 
 ```java
 SpotifyApi api = new SpotifyApi();
@@ -74,7 +84,51 @@ RestAdapter restAdapter = new RestAdapter.Builder()
 SpotifyService spotify = restAdapter.create(SpotifyService.class);
 ```
 
+## Obtaining Access Tokens
+
+The most straightforward way to get the access token is to use the Authentication Library from the [Spotify Android SDK](https://github.com/spotify/android-sdk).
+Detailed information how to use it can be found in the [Spotify Android SDK Authentication Guide](https://developer.spotify.com/technologies/spotify-android-sdk/android-sdk-authentication-guide/).
+
+Feeling adventurous? You can implement the auth flow yourself, following the [Spotify Authorization Guide](https://developer.spotify.com/web-api/authorization-guide/).
+
+
+## Error Handling
+
+When using Retrofit, errors are returned as [`RetrofitError`](http://square.github.io/retrofit/javadoc/retrofit/RetrofitError.html)
+objects. These objects, among others, contain HTTP status codes and their descriptions,
+for example `400 - Bad Request`.
+In many cases this will work well enough but in some cases Spotify Web API returns more detailed information,
+for example `400 - No search query`.
+
+To use the data returned in the response from the Web API `SpotifyCallback` object should be passed to the
+request method instead of regular Retrofit's `Callback`:
+```java
+spotify.getMySavedTracks(new SpotifyCallback<Pager<SavedTrack>>() {
+    @Override
+    public void success(Pager<SavedTrack> savedTrackPager, Response response) {
+        // handle successful response
+    }
+
+    @Override
+    public void failure(SpotifyError error) {
+        // handle error
+    }
+});
+```
+For synchronous requests `RetrofitError` can be converted to `SpotifyError` if needed:
+```java
+try {
+    Pager<SavedTrack> mySavedTracks = spotify.getMySavedTracks();
+} catch (RetrofitError error) {
+    SpotifyError spotifyError = SpotifyError.fromRetrofitError(error);
+    // handle error
+}
+```
+
 ## Help
+
+#### Versioning policy
+We use [Semantic Versioning 2.0.0](http://semver.org/) as our versioning policy.
 
 #### Bugs, Feature requests
 Found a bug? Something that's missing? Feedback is an important part of improving the project, so please [open an issue](https://github.com/kaaes/spotify-web-api-android/issues).
